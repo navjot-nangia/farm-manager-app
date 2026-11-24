@@ -306,6 +306,19 @@ document.querySelector("#installApp").addEventListener("click", async () => {
   deferredInstallPrompt = null; document.querySelector("#installApp").hidden = true;
 });
 
-if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js"));
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    const registration = await navigator.serviceWorker.register("service-worker.js").catch(() => null);
+    if (!registration) return;
+    registration.update().catch(() => {});
+
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  });
+}
 render();
 if (localStorage.getItem(SESSION_KEY) === "active") showApp(); else showLogin();
