@@ -1,4 +1,4 @@
-const STORAGE_KEY = "farm-manager-v1";
+const STORAGE_KEY = "farm-manager-v2";
 const SESSION_KEY = "farm-manager-demo-session";
 const DEMO_USERNAME = "manager";
 const DEMO_PASSWORD = "farm123";
@@ -75,9 +75,6 @@ const toISODate = (date) => date.toISOString().slice(0, 10);
 const formatDate = (date, options = { month: "short", day: "numeric" }) => new Intl.DateTimeFormat("en-US", options).format(date);
 const escapeHTML = (value = "") => String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
 
-const demoPlanting = new Date();
-demoPlanting.setDate(demoPlanting.getDate() - 17);
-
 let state = loadState();
 let currentFilter = "open";
 let currentGuide = "cotton";
@@ -89,7 +86,7 @@ function loadState() {
     if (saved?.fields && saved?.completed) return saved;
   } catch (_) {}
   return {
-    fields: [{ id: crypto.randomUUID(), name: "North 40", crop: "cotton", acres: 40, variety: "Demo variety", planted: toISODate(demoPlanting), location: "Texas" }],
+    fields: [],
     completed: []
   };
 }
