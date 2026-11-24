@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#173e2b" />
+    <meta name="description" content="A simple crop planning and daily task companion for farm managers." />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Farm Manager</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <a class="brand" href="#today" aria-label="Farm Manager home">
+          <span class="brand-mark" aria-hidden="true">FM</span>
+          <span>Farm Manager</span>
+        </a>
+
+        <nav class="nav-list">
+          <button class="nav-item active" data-view="today"><span aria-hidden="true">⌂</span> Today</button>
+          <button class="nav-item" data-view="fields"><span aria-hidden="true">▦</span> Fields</button>
+          <button class="nav-item" data-view="guide"><span aria-hidden="true">◎</span> Crop guide</button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="install-button" id="installApp" hidden>Install app</button>
+          <p>Works offline. Your farm data stays on this device.</p>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="todayDate"></p>
+            <h1 id="pageTitle">Good morning</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-button" id="enableNotifications" aria-label="Enable reminders" title="Enable reminders">♢</button>
+            <button class="primary-button" id="openAddField"><span aria-hidden="true">＋</span> Add field</button>
+          </div>
+        </header>
+
+        <section class="view active" id="todayView" aria-labelledby="pageTitle">
+          <div class="weather-note">
+            <span class="weather-icon" aria-hidden="true">☀</span>
+            <div>
+              <strong>Plan the day with field conditions in mind</strong>
+              <p>Weather integration comes next. For now, verify wind, rain, soil moisture, and label restrictions before field work.</p>
+            </div>
+          </div>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Daily plan</p>
+              <h2>What needs attention</h2>
+            </div>
+            <div class="segmented-control" aria-label="Filter tasks">
+              <button class="active" data-filter="open">Open</button>
+              <button data-filter="all">All</button>
+            </div>
+          </div>
+
+          <div class="task-list" id="taskList"></div>
+
+          <section class="coming-up">
+            <div class="section-heading compact">
+              <div>
+                <p class="eyebrow">Next 14 days</p>
+                <h2>Coming up</h2>
+              </div>
+            </div>
+            <div class="timeline" id="upcomingList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="fieldsView">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">This season</p>
+              <h2>Your fields</h2>
+            </div>
+          </div>
+          <div class="field-grid" id="fieldGrid"></div>
+        </section>
+
+        <section class="view" id="guideView">
+          <div class="guide-intro">
+            <p class="eyebrow">Texas starter library</p>
+            <h2>Crop planning guides</h2>
+            <p>Choose a crop to see the planning milestones used to build its field timeline. These are editable starter templates—not pesticide recommendations.</p>
+          </div>
+          <div class="crop-tabs" id="cropTabs"></div>
+          <div class="guide-card" id="guideCard"></div>
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <button class="active" data-view="today"><span>⌂</span>Today</button>
+      <button data-view="fields"><span>▦</span>Fields</button>
+      <button data-view="guide"><span>◎</span>Guide</button>
+    </nav>
+
+    <dialog id="fieldDialog">
+      <form method="dialog" id="fieldForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">New crop</p>
+            <h2>Add a field</h2>
+          </div>
+          <button class="close-button" value="cancel" aria-label="Close">×</button>
+        </div>
+
+        <label>Field name<input name="name" required placeholder="e.g. North 40" /></label>
+        <div class="form-row">
+          <label>Crop
+            <select name="crop" required>
+              <option value="cotton">Cotton</option>
+              <option value="soybean">Soybean</option>
+              <option value="corn">Corn</option>
+              <option value="sorghum">Sorghum</option>
+              <option value="wheat">Wheat</option>
+            </select>
+          </label>
+          <label>Acres<input name="acres" type="number" min="0.1" step="0.1" required placeholder="40" /></label>
+        </div>
+        <label>Variety or hybrid<input name="variety" placeholder="Optional" /></label>
+        <label>Planting date<input name="planted" type="date" required /></label>
+        <label>Location<input name="location" value="Texas" placeholder="County or state" /></label>
+
+        <div class="notice"><strong>Before acting:</strong> Confirm recommendations with your local Extension specialist, product label, and field conditions.</div>
+        <div class="dialog-actions">
+          <button class="secondary-button" value="cancel">Cancel</button>
+          <button class="primary-button" value="default" id="saveField">Create timeline</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js" defer></script>
+  </body>
+</html>
