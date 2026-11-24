@@ -1,4 +1,7 @@
 const STORAGE_KEY = "farm-manager-v1";
+const SESSION_KEY = "farm-manager-demo-session";
+const DEMO_USERNAME = "manager";
+const DEMO_PASSWORD = "farm123";
 
 const cropGuides = {
   cotton: {
@@ -242,6 +245,25 @@ function showToast(message) {
   showToast.timer = setTimeout(() => toast.classList.remove("show"), 2400);
 }
 
+function showApp() {
+  document.querySelector("#loginScreen").hidden = true;
+  document.querySelector("#appShell").hidden = false;
+  document.querySelector("#mobileNav").hidden = false;
+}
+
+function showLogin() {
+  document.querySelector("#appShell").hidden = true;
+  document.querySelector("#mobileNav").hidden = true;
+  document.querySelector("#loginScreen").hidden = false;
+  document.querySelector("#loginError").hidden = true;
+  document.querySelector("#loginForm").elements.username.focus();
+}
+
+function logOut() {
+  localStorage.removeItem(SESSION_KEY);
+  showLogin();
+}
+
 document.addEventListener("click", (event) => {
   const target = event.target.closest("button, [data-view]");
   if (!target) return;
@@ -260,6 +282,17 @@ document.addEventListener("click", (event) => {
 
 document.querySelector("#saveField").addEventListener("click", (event) => { event.preventDefault(); createField(); });
 document.querySelector("#enableNotifications").addEventListener("click", enableNotifications);
+document.querySelector("#loginForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const data = new FormData(event.currentTarget);
+  const valid = data.get("username").trim().toLowerCase() === DEMO_USERNAME && data.get("password") === DEMO_PASSWORD;
+  document.querySelector("#loginError").hidden = valid;
+  if (!valid) return;
+  localStorage.setItem(SESSION_KEY, "active");
+  showApp();
+});
+document.querySelector("#logoutApp").addEventListener("click", logOut);
+document.querySelector("#mobileLogout").addEventListener("click", logOut);
 document.querySelector("#todayDate").textContent = formatDate(new Date(), { weekday: "long", month: "long", day: "numeric" });
 document.querySelector("#pageTitle").textContent = greeting();
 
@@ -275,3 +308,4 @@ document.querySelector("#installApp").addEventListener("click", async () => {
 
 if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("service-worker.js"));
 render();
+if (localStorage.getItem(SESSION_KEY) === "active") showApp(); else showLogin();

@@ -12,7 +12,40 @@
     <title>Farm Manager</title>
   </head>
   <body>
-    <div class="app-shell">
+    <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
+      <div class="login-story" aria-hidden="true">
+        <a class="brand login-brand" href="#"><span class="brand-mark">FM</span><span>Farm Manager</span></a>
+        <div class="login-story-copy">
+          <p class="eyebrow">A calmer day in the field</p>
+          <h1>Know what needs attention, before the day gets away.</h1>
+          <p>Keep fields, crop milestones, scouting checks, and reminders together in one simple plan.</p>
+        </div>
+        <div class="field-lines"><span></span><span></span><span></span><span></span></div>
+      </div>
+
+      <div class="login-panel">
+        <form class="login-card" id="loginForm">
+          <p class="eyebrow">Welcome back</p>
+          <h2 id="loginTitle">Log in to your farm</h2>
+          <p class="login-subtitle">Use the demo account below to explore the first version.</p>
+
+          <div class="demo-credentials" aria-label="Demo login credentials">
+            <span>Demo login</span>
+            <strong>manager</strong>
+            <span>Password</span>
+            <strong>farm123</strong>
+          </div>
+
+          <label>Username<input name="username" autocomplete="username" value="manager" required /></label>
+          <label>Password<input name="password" type="password" autocomplete="current-password" value="farm123" required /></label>
+          <p class="login-error" id="loginError" role="alert" hidden>That login does not match the demo account.</p>
+          <button class="primary-button login-submit" type="submit">Log in</button>
+          <p class="prototype-note">Prototype access only. This screen does not protect sensitive farm data yet.</p>
+        </form>
+      </div>
+    </section>
+
+    <div class="app-shell" id="appShell" hidden>
       <aside class="sidebar" aria-label="Primary navigation">
         <a class="brand" href="#today" aria-label="Farm Manager home">
           <span class="brand-mark" aria-hidden="true">FM</span>
@@ -27,6 +60,7 @@
 
         <div class="sidebar-footer">
           <button class="install-button" id="installApp" hidden>Install app</button>
+          <button class="logout-button" id="logoutApp">Log out</button>
           <p>Works offline. Your farm data stays on this device.</p>
         </div>
       </aside>
@@ -39,6 +73,7 @@
           </div>
           <div class="topbar-actions">
             <button class="icon-button" id="enableNotifications" aria-label="Enable reminders" title="Enable reminders">♢</button>
+            <button class="icon-button mobile-logout" id="mobileLogout" aria-label="Log out" title="Log out">↪</button>
             <button class="primary-button" id="openAddField"><span aria-hidden="true">＋</span> Add field</button>
           </div>
         </header>
@@ -98,7 +133,7 @@
       </main>
     </div>
 
-    <nav class="mobile-nav" aria-label="Mobile navigation">
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation" hidden>
       <button class="active" data-view="today"><span>⌂</span>Today</button>
       <button data-view="fields"><span>▦</span>Fields</button>
       <button data-view="guide"><span>◎</span>Guide</button>
