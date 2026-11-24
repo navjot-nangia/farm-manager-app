@@ -6,8 +6,11 @@ A mobile-first progressive web app for turning a crop planting date into a simpl
 
 - Add fields with crop, variety, acres, location, and planting date
 - Generate stage-based crop planning milestones
-- Daily and upcoming task views
-- Complete tasks and export individual reminders to a calendar
+- A single "Your next step" card for non-technical farm managers
+- Guided two-step field setup
+- Daily, upcoming, and all-task views
+- Complete or snooze tasks, report field issues, and save notes or photo evidence
+- Export individual reminders to a calendar
 - On-device storage, offline support, and PWA installation
 - Starter templates for cotton, soybean, corn, sorghum, and wheat
 

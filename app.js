@@ -71,7 +71,7 @@ const typeForTitle = (title) => {
 
 const dateOnly = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 const addDays = (date, days) => { const next = new Date(`${date}T12:00:00`); next.setDate(next.getDate() + days); return next; };
-const toISODate = (date) => date.toISOString().slice(0, 10);
+const toISODate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const formatDate = (date, options = { month: "short", day: "numeric" }) => new Intl.DateTimeFormat("en-US", options).format(date);
 const escapeHTML = (value = "") => String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
 
@@ -79,36 +79,67 @@ let state = loadState();
 let currentFilter = "open";
 let currentGuide = "cotton";
 let deferredInstallPrompt;
+let selectedTaskId = null;
+let pendingTaskPhoto = null;
+let currentFieldStep = 1;
 
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved?.fields && saved?.completed) return saved;
+    if (saved?.fields && saved?.completed) {
+      return { ...saved, taskRecords: saved.taskRecords || {} };
+    }
   } catch (_) {}
   return {
     fields: [],
-    completed: []
+    completed: [],
+    taskRecords: {}
   };
 }
 
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-
-function tasksForField(field) {
-  return cropGuides[field.crop].milestones.map(([offset, title, description]) => ({
-    id: `${field.id}-${offset}`,
-    fieldId: field.id,
-    fieldName: field.name,
-    crop: field.crop,
-    title,
-    description,
-    type: typeForTitle(title),
-    offset,
-    due: addDays(field.planted, offset),
-    done: state.completed.includes(`${field.id}-${offset}`)
-  }));
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return true;
+  } catch (_) {
+    showToast("This device is out of storage. Remove a photo and try again.");
+    return false;
+  }
 }
 
-function allTasks() { return state.fields.flatMap(tasksForField).sort((a, b) => a.due - b.due); }
+function tasksForField(field) {
+  return cropGuides[field.crop].milestones.map(([offset, title, description]) => {
+    const id = `${field.id}-${offset}`;
+    const record = state.taskRecords[id] || {};
+    return {
+      id,
+      fieldId: field.id,
+      fieldName: field.name,
+      crop: field.crop,
+      title,
+      description,
+      type: typeForTitle(title),
+      offset,
+      originalDue: addDays(field.planted, offset),
+      due: record.snoozedUntil ? new Date(`${record.snoozedUntil}T12:00:00`) : addDays(field.planted, offset),
+      done: state.completed.includes(id) || record.status === "complete",
+      issue: record.status === "issue",
+      record
+    };
+  });
+}
+
+function allTasks() { return state.fields.flatMap(tasksForField).sort((a, b) => Number(b.issue) - Number(a.issue) || a.due - b.due); }
+
+function daysFromToday(date) { return Math.round((dateOnly(date) - dateOnly(new Date())) / 86400000); }
+
+function taskTiming(task) {
+  const days = daysFromToday(task.due);
+  if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue`;
+  if (days === 0) return "Due today";
+  if (days === 1) return "Due tomorrow";
+  return `Due in ${days} days · ${formatDate(task.due)}`;
+}
 
 function render() {
   renderToday();
@@ -121,21 +152,36 @@ function renderToday() {
   const horizon = new Date(now); horizon.setDate(horizon.getDate() + 3);
   const upcomingHorizon = new Date(now); upcomingHorizon.setDate(upcomingHorizon.getDate() + 14);
   const tasks = allTasks();
-  const attention = tasks.filter((task) => task.due <= horizon && (currentFilter === "all" || !task.done));
+  const openTasks = tasks.filter((task) => !task.done);
+  const nextTask = openTasks[0];
+  const nextAction = document.querySelector("#nextAction");
+
+  if (!state.fields.length) {
+    nextAction.innerHTML = `<article class="next-action empty"><p class="eyebrow">Start here</p><h2>Add your first field</h2><p class="next-action-copy">Tell us what was planted and when. We’ll turn it into a simple list of next steps.</p><div class="next-action-buttons"><button class="action-primary" data-add-field>Add a field</button></div></article>`;
+  } else if (!nextTask) {
+    nextAction.innerHTML = `<article class="next-action empty"><p class="eyebrow">Season plan</p><h2>All planned work is complete</h2><p class="next-action-copy">There are no open tasks. You can review completed work or add another field.</p><div class="next-action-buttons"><button class="action-primary" data-show-all>Review all tasks</button></div></article>`;
+  } else {
+    const days = daysFromToday(nextTask.due);
+    const eyebrow = nextTask.issue ? "Issue needs attention" : days < 0 ? "Your next step · overdue" : days === 0 ? "Your next step · today" : `Your next step · in ${days} day${days === 1 ? "" : "s"}`;
+    const buttonLabel = nextTask.issue ? "Review issue" : days <= 0 ? "Start this task" : "Review next task";
+    nextAction.innerHTML = `<article class="next-action"><p class="eyebrow">${eyebrow}</p><h2>${escapeHTML(nextTask.title)}</h2><p class="next-action-copy">${escapeHTML(nextTask.description)}</p><p class="next-action-meta">${escapeHTML(nextTask.fieldName)} · ${escapeHTML(nextTask.crop)} · ${taskTiming(nextTask)}</p><div class="next-action-buttons"><button class="action-primary" data-task-details="${nextTask.id}">${buttonLabel}</button><button class="action-secondary" data-calendar="${nextTask.id}">Add to calendar</button></div></article>`;
+  }
+
+  const attention = currentFilter === "all"
+    ? tasks.filter((task) => task.id !== nextTask?.id)
+    : openTasks.filter((task) => task.id !== nextTask?.id && task.due <= horizon);
   const taskList = document.querySelector("#taskList");
 
   taskList.innerHTML = attention.length ? attention.map((task) => {
-    const days = Math.round((dateOnly(task.due) - now) / 86400000);
-    const timing = days < 0 ? `${Math.abs(days)} day${Math.abs(days) === 1 ? "" : "s"} overdue` : days === 0 ? "Due today" : days === 1 ? "Due tomorrow" : `Due ${formatDate(task.due)}`;
-    return `<article class="task-card ${days < 0 && !task.done ? "overdue" : ""} ${task.done ? "done" : ""}">
-      <button class="task-check" data-complete="${task.id}" aria-label="${task.done ? "Mark open" : "Mark complete"}">${task.done ? "✓" : ""}</button>
-      <div><h3 class="task-title">${escapeHTML(task.title)}</h3><p class="task-meta">${escapeHTML(task.fieldName)} · ${timing}</p></div>
-      <div class="task-menu"><span class="task-type">${task.type}</span><button class="small-button" data-calendar="${task.id}">Calendar</button></div>
+    const days = daysFromToday(task.due);
+    return `<article class="task-card ${days < 0 && !task.done ? "overdue" : ""} ${task.done ? "done" : ""} ${task.issue ? "issue" : ""}">
+      <div><h3 class="task-title">${escapeHTML(task.title)}</h3><p class="task-meta">${escapeHTML(task.fieldName)} · ${taskTiming(task)}</p>${task.issue ? '<span class="issue-label">Issue reported</span>' : ""}</div>
+      <div class="task-menu"><span class="task-type">${task.type}</span><button class="small-button" data-task-details="${task.id}">${task.done ? "Review" : "Open"}</button></div>
     </article>`;
-  }).join("") : `<div class="empty-state"><h3>${state.fields.length ? "You’re caught up" : "Add your first field"}</h3><p>${state.fields.length ? "No open field tasks need attention in the next three days." : "A field creates a crop timeline and turns it into a clear daily plan."}</p><button class="primary-button" data-add-field>${state.fields.length ? "View all tasks" : "Add a field"}</button></div>`;
+  }).join("") : `<div class="empty-state"><h3>${currentFilter === "all" ? "No other tasks" : "Nothing else is due soon"}</h3><p>${currentFilter === "all" ? "The next-step card above has the only task in this plan." : "Focus on the next step above. Future work is listed below."}</p>${currentFilter === "all" ? "" : '<button class="secondary-button" data-show-all>View all tasks</button>'}</div>`;
 
-  const upcoming = tasks.filter((task) => !task.done && task.due > horizon && task.due <= upcomingHorizon).slice(0, 5);
-  document.querySelector("#upcomingList").innerHTML = upcoming.length ? upcoming.map((task) => `<article class="timeline-item"><span class="timeline-date">${formatDate(task.due, { weekday: "short", month: "short", day: "numeric" })}</span><h3>${escapeHTML(task.title)}</h3><p>${escapeHTML(task.fieldName)} · ${escapeHTML(task.crop)}</p></article>`).join("") : `<p class="task-meta">No additional milestones in the next 14 days.</p>`;
+  const upcoming = openTasks.filter((task) => task.id !== nextTask?.id && task.due > horizon && task.due <= upcomingHorizon).slice(0, 5);
+  document.querySelector("#upcomingList").innerHTML = upcoming.length ? upcoming.map((task) => `<button class="timeline-item" data-task-details="${task.id}"><span class="timeline-date">${formatDate(task.due, { weekday: "short", month: "short", day: "numeric" })}</span><h3>${escapeHTML(task.title)}</h3><p>${escapeHTML(task.fieldName)} · ${escapeHTML(task.crop)}</p></button>`).join("") : `<p class="task-meta">No additional milestones in the next 14 days.</p>`;
 }
 
 function renderFields() {
@@ -149,7 +195,7 @@ function renderFields() {
     const tasks = tasksForField(field);
     const done = tasks.filter((task) => task.done).length;
     return `<article class="field-card" data-crop="${field.crop}">
-      <div class="field-card-top"><span class="crop-label">${escapeHTML(field.crop)}</span><button class="delete-field" data-delete-field="${field.id}" aria-label="Delete ${escapeHTML(field.name)}">•••</button></div>
+      <div class="field-card-top"><span class="crop-label">${escapeHTML(field.crop)}</span><button class="delete-field" data-delete-field="${field.id}" aria-label="Remove ${escapeHTML(field.name)}">Remove</button></div>
       <h3>${escapeHTML(field.name)}</h3><p>${escapeHTML(field.variety || "Variety not recorded")} · ${escapeHTML(field.location || "Location not recorded")}</p>
       <div class="field-stats"><div class="field-stat"><strong>${escapeHTML(field.acres)}</strong><span>acres</span></div><div class="field-stat"><strong>${age}</strong><span>days planted</span></div><div class="field-stat"><strong>${done}/${tasks.length}</strong><span>tasks done</span></div></div>
     </article>`;
@@ -177,9 +223,30 @@ function greeting() {
 function openFieldDialog() {
   const form = document.querySelector("#fieldForm");
   form.reset();
-  form.elements.location.value = "Texas";
   form.elements.planted.value = toISODate(new Date());
+  setFieldStep(1);
   document.querySelector("#fieldDialog").showModal();
+}
+
+function setFieldStep(step) {
+  currentFieldStep = step;
+  document.querySelectorAll("[data-form-step]").forEach((node) => {
+    node.hidden = Number(node.dataset.formStep) !== step;
+    node.classList.toggle("active", Number(node.dataset.formStep) === step);
+  });
+  document.querySelector("#fieldStepLabel").textContent = `Step ${step} of 2`;
+  document.querySelector("#fieldDialogTitle").textContent = step === 1 ? "Which field?" : "When was it planted?";
+  document.querySelector("#nextFieldStep").hidden = step !== 1;
+  document.querySelector("#backFieldStep").hidden = step !== 2;
+  document.querySelector("#saveField").hidden = step !== 2;
+}
+
+function continueFieldSetup() {
+  const form = document.querySelector("#fieldForm");
+  const required = [form.elements.name, form.elements.crop, form.elements.acres];
+  if (!required.every((input) => input.reportValidity())) return;
+  setFieldStep(2);
+  form.elements.planted.focus();
 }
 
 function createField() {
@@ -194,8 +261,8 @@ function createField() {
   saveState();
   render();
   document.querySelector("#fieldDialog").close();
-  setView("fields");
-  showToast("Field timeline created");
+  setView("today");
+  showToast("Field plan created — your next step is ready");
 }
 
 function toggleTask(id) {
@@ -208,7 +275,110 @@ function deleteField(id) {
   if (!field || !confirm(`Remove ${field.name} and its task history from this device?`)) return;
   state.fields = state.fields.filter((item) => item.id !== id);
   state.completed = state.completed.filter((item) => !item.startsWith(`${id}-`));
+  Object.keys(state.taskRecords).filter((taskId) => taskId.startsWith(`${id}-`)).forEach((taskId) => delete state.taskRecords[taskId]);
   saveState(); render(); showToast("Field removed");
+}
+
+function openTaskDialog(id) {
+  const task = allTasks().find((item) => item.id === id);
+  if (!task) return;
+  selectedTaskId = id;
+  pendingTaskPhoto = task.record.photo || null;
+  document.querySelector("#taskDialogType").textContent = task.issue ? "Issue reported" : task.type;
+  document.querySelector("#taskDialogTitle").textContent = task.title;
+  document.querySelector("#taskDialogMeta").textContent = `${task.fieldName} · ${task.crop} · ${taskTiming(task)}`;
+  document.querySelector("#taskDialogDescription").textContent = task.description;
+  document.querySelector("#taskNote").value = task.record.note || "";
+  document.querySelector("#taskPhoto").value = "";
+  document.querySelector("#completeTask").textContent = task.done ? "Reopen task" : "Mark complete";
+  document.querySelector("#reportIssue").textContent = task.issue ? "Update issue" : "Report an issue";
+  renderPhotoPreview();
+  document.querySelector("#taskDialog").showModal();
+}
+
+function renderPhotoPreview() {
+  const preview = document.querySelector("#photoPreview");
+  preview.hidden = !pendingTaskPhoto;
+  preview.style.backgroundImage = pendingTaskPhoto ? `url("${pendingTaskPhoto}")` : "";
+  preview.setAttribute("aria-label", pendingTaskPhoto ? "Attached field photo" : "");
+}
+
+function readTaskPhoto(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) return showToast("Please choose an image");
+  if (file.size > 8 * 1024 * 1024) return showToast("Please choose a photo smaller than 8 MB");
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const image = new Image();
+    image.onload = () => {
+      const maxSize = 1000;
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      pendingTaskPhoto = canvas.toDataURL("image/jpeg", 0.68);
+      renderPhotoPreview();
+    };
+    image.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function taskRecordInput(status) {
+  return {
+    ...(state.taskRecords[selectedTaskId] || {}),
+    status,
+    note: document.querySelector("#taskNote").value.trim(),
+    photo: pendingTaskPhoto,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function completeSelectedTask() {
+  const task = allTasks().find((item) => item.id === selectedTaskId);
+  if (!task) return;
+  if (task.done) {
+    state.completed = state.completed.filter((id) => id !== selectedTaskId);
+    state.taskRecords[selectedTaskId] = taskRecordInput("open");
+    showToast("Task reopened");
+  } else {
+    if (!state.completed.includes(selectedTaskId)) state.completed.push(selectedTaskId);
+    state.taskRecords[selectedTaskId] = { ...taskRecordInput("complete"), completedAt: new Date().toISOString() };
+    showToast("Task completed");
+  }
+  saveState();
+  render();
+  document.querySelector("#taskDialog").close();
+}
+
+function reportSelectedIssue() {
+  const note = document.querySelector("#taskNote").value.trim();
+  if (!note) {
+    document.querySelector("#taskNote").focus();
+    return showToast("Add a short note describing the issue");
+  }
+  state.completed = state.completed.filter((id) => id !== selectedTaskId);
+  state.taskRecords[selectedTaskId] = taskRecordInput("issue");
+  saveState();
+  render();
+  document.querySelector("#taskDialog").close();
+  showToast("Issue saved for follow-up");
+}
+
+function snoozeSelectedTask() {
+  const task = allTasks().find((item) => item.id === selectedTaskId);
+  if (!task) return;
+  const base = task.due > new Date() ? task.due : new Date();
+  const snoozed = new Date(base);
+  snoozed.setDate(snoozed.getDate() + 1);
+  state.completed = state.completed.filter((id) => id !== selectedTaskId);
+  state.taskRecords[selectedTaskId] = { ...taskRecordInput("open"), snoozedUntil: toISODate(snoozed) };
+  saveState();
+  render();
+  document.querySelector("#taskDialog").close();
+  showToast("Task moved to tomorrow");
 }
 
 function exportCalendar(id) {
@@ -262,13 +432,19 @@ function logOut() {
 }
 
 document.addEventListener("click", (event) => {
-  const target = event.target.closest("button, [data-view]");
+  const target = event.target.closest("button, [data-view], [data-task-details]");
   if (!target) return;
   if (target.dataset.view) setView(target.dataset.view);
   if (target.matches("#openAddField, [data-add-field]")) openFieldDialog();
-  if (target.dataset.complete) toggleTask(target.dataset.complete);
+  if (target.dataset.taskDetails) openTaskDialog(target.dataset.taskDetails);
   if (target.dataset.calendar) exportCalendar(target.dataset.calendar);
   if (target.dataset.deleteField) deleteField(target.dataset.deleteField);
+  if (target.hasAttribute("data-show-all")) {
+    currentFilter = "all";
+    document.querySelectorAll("[data-filter]").forEach((node) => node.classList.toggle("active", node.dataset.filter === "all"));
+    renderToday();
+    document.querySelector("#taskList").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   if (target.dataset.cropTab) { currentGuide = target.dataset.cropTab; renderGuide(); }
   if (target.dataset.filter) {
     currentFilter = target.dataset.filter;
@@ -277,7 +453,16 @@ document.addEventListener("click", (event) => {
   }
 });
 
-document.querySelector("#saveField").addEventListener("click", (event) => { event.preventDefault(); createField(); });
+document.querySelector("#fieldForm").addEventListener("submit", (event) => { event.preventDefault(); createField(); });
+document.querySelector("#nextFieldStep").addEventListener("click", continueFieldSetup);
+document.querySelector("#backFieldStep").addEventListener("click", () => setFieldStep(1));
+document.querySelector("#closeFieldDialog").addEventListener("click", () => document.querySelector("#fieldDialog").close());
+document.querySelector("#cancelFieldDialog").addEventListener("click", () => document.querySelector("#fieldDialog").close());
+document.querySelector("#closeTaskDialog").addEventListener("click", () => document.querySelector("#taskDialog").close());
+document.querySelector("#completeTask").addEventListener("click", completeSelectedTask);
+document.querySelector("#reportIssue").addEventListener("click", reportSelectedIssue);
+document.querySelector("#snoozeTask").addEventListener("click", snoozeSelectedTask);
+document.querySelector("#taskPhoto").addEventListener("change", (event) => readTaskPhoto(event.target.files[0]));
 document.querySelector("#enableNotifications").addEventListener("click", enableNotifications);
 document.querySelector("#loginForm").addEventListener("submit", (event) => {
   event.preventDefault();

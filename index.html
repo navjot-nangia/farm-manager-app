@@ -79,28 +79,27 @@
         </header>
 
         <section class="view active" id="todayView" aria-labelledby="pageTitle">
-          <div class="weather-note">
-            <span class="weather-icon" aria-hidden="true">☀</span>
-            <div>
-              <strong>Plan the day with field conditions in mind</strong>
-              <p>Weather integration comes next. For now, verify wind, rain, soil moisture, and label restrictions before field work.</p>
-            </div>
+          <div id="nextAction"></div>
+
+          <div class="conditions-note">
+            <span aria-hidden="true">☀</span>
+            <p><strong>Before field work:</strong> Check wind, rain, soil moisture, and label restrictions.</p>
           </div>
 
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Daily plan</p>
-              <h2>What needs attention</h2>
+              <p class="eyebrow">Task list</p>
+              <h2>Other work</h2>
             </div>
             <div class="segmented-control" aria-label="Filter tasks">
-              <button class="active" data-filter="open">Open</button>
-              <button data-filter="all">All</button>
+              <button class="active" data-filter="open">Due soon</button>
+              <button data-filter="all">All tasks</button>
             </div>
           </div>
 
           <div class="task-list" id="taskList"></div>
 
-          <section class="coming-up">
+          <section class="coming-up" id="comingUpSection">
             <div class="section-heading compact">
               <div>
                 <p class="eyebrow">Next 14 days</p>
@@ -140,36 +139,75 @@
     </nav>
 
     <dialog id="fieldDialog">
-      <form method="dialog" id="fieldForm">
+      <form id="fieldForm">
         <div class="dialog-header">
           <div>
-            <p class="eyebrow">New crop</p>
-            <h2>Add a field</h2>
+            <p class="eyebrow" id="fieldStepLabel">Step 1 of 2</p>
+            <h2 id="fieldDialogTitle">Which field?</h2>
           </div>
-          <button class="close-button" value="cancel" aria-label="Close">×</button>
+          <button class="close-button" id="closeFieldDialog" type="button" aria-label="Close">×</button>
         </div>
 
-        <label>Field name<input name="name" required placeholder="e.g. North 40" /></label>
-        <div class="form-row">
-          <label>Crop
-            <select name="crop" required>
-              <option value="cotton">Cotton</option>
-              <option value="soybean">Soybean</option>
-              <option value="corn">Corn</option>
-              <option value="sorghum">Sorghum</option>
-              <option value="wheat">Wheat</option>
-            </select>
-          </label>
-          <label>Acres<input name="acres" type="number" min="0.1" step="0.1" required placeholder="40" /></label>
+        <div class="form-step active" data-form-step="1">
+          <p class="step-help">Use the name your crew already uses.</p>
+          <label>What do you call this field?<input name="name" required placeholder="Example: North 40" /></label>
+          <div class="form-row">
+            <label>What is planted?
+              <select name="crop" required>
+                <option value="cotton">Cotton</option>
+                <option value="soybean">Soybean</option>
+                <option value="corn">Corn</option>
+                <option value="sorghum">Sorghum</option>
+                <option value="wheat">Wheat</option>
+              </select>
+            </label>
+            <label>How many acres?<input name="acres" type="number" min="0.1" step="0.1" required inputmode="decimal" placeholder="Example: 40" /></label>
+          </div>
         </div>
-        <label>Variety or hybrid<input name="variety" placeholder="Optional" /></label>
-        <label>Planting date<input name="planted" type="date" required /></label>
-        <label>Location<input name="location" value="Texas" placeholder="County or state" /></label>
 
-        <div class="notice"><strong>Before acting:</strong> Confirm recommendations with your local Extension specialist, product label, and field conditions.</div>
+        <div class="form-step" data-form-step="2" hidden>
+          <p class="step-help">These details set the timing of the field plan.</p>
+          <label>When was it planted?<input name="planted" type="date" required /></label>
+          <label>Variety or hybrid <span class="optional">Optional</span><input name="variety" placeholder="Enter if known" /></label>
+          <label>County or area <span class="optional">Optional</span><input name="location" placeholder="Example: Brazos County, Texas" /></label>
+          <div class="notice"><strong>Planning reminder:</strong> Confirm recommendations with local Extension guidance, product labels, and current field conditions.</div>
+        </div>
+
         <div class="dialog-actions">
-          <button class="secondary-button" value="cancel">Cancel</button>
-          <button class="primary-button" value="default" id="saveField">Create timeline</button>
+          <button class="secondary-button" id="cancelFieldDialog" type="button">Cancel</button>
+          <button class="secondary-button" id="backFieldStep" type="button" hidden>Back</button>
+          <button class="primary-button" id="nextFieldStep" type="button">Continue</button>
+          <button class="primary-button" id="saveField" type="submit" hidden>Create field plan</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="taskDialog">
+      <form id="taskForm">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow" id="taskDialogType">Field task</p>
+            <h2 id="taskDialogTitle">Task</h2>
+          </div>
+          <button class="close-button" id="closeTaskDialog" type="button" aria-label="Close">×</button>
+        </div>
+
+        <div class="task-detail-meta" id="taskDialogMeta"></div>
+        <p class="task-instructions" id="taskDialogDescription"></p>
+
+        <label>What did you find? <span class="optional">Optional</span>
+          <textarea id="taskNote" name="note" rows="4" placeholder="Add a short note for yourself or a supervisor"></textarea>
+        </label>
+
+        <label class="photo-field">Add a photo <span class="optional">Optional</span>
+          <input id="taskPhoto" name="photo" type="file" accept="image/*" capture="environment" />
+        </label>
+        <div class="photo-preview" id="photoPreview" hidden></div>
+
+        <div class="task-actions">
+          <button class="secondary-button" id="snoozeTask" type="button">Can’t do today</button>
+          <button class="issue-button" id="reportIssue" type="button">Report an issue</button>
+          <button class="primary-button" id="completeTask" type="button">Mark complete</button>
         </div>
       </form>
     </dialog>
